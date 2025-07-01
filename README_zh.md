@@ -65,7 +65,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 2. 克隆仓库：
 
 ```bash
-git clone https://github.com/FoundationAgents/OpenManus.git
+git clone https://github.com/Mrguanglei/OpenManus.git
 cd OpenManus
 ```
 
