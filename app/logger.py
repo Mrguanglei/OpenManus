@@ -1,5 +1,6 @@
 import sys
 from datetime import datetime
+import os
 
 from loguru import logger as _logger
 
@@ -27,6 +28,20 @@ def define_log_level(print_level="INFO", logfile_level="DEBUG", name: str = None
 
 
 logger = define_log_level()
+
+
+def write_trace_md(content: str, filename: str = None):
+    """
+    Write detailed trace info to a markdown file in logs/trace/.
+    If filename is None, use trace_时间戳.md
+    """
+    trace_dir = PROJECT_ROOT / "logs/trace"
+    os.makedirs(trace_dir, exist_ok=True)
+    if filename is None:
+        filename = f"trace_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+    file_path = trace_dir / filename
+    with open(file_path, "a", encoding="utf-8") as f:
+        f.write(content + "\n")
 
 
 if __name__ == "__main__":

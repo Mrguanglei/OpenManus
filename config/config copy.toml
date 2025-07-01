@@ -1,0 +1,26 @@
+[llm]
+model = "DeepSeek-R1-0528"
+base_url = "https://www.sophnet.com/api/open-apis/v1"
+api_key = "OE3HhfIOuAoO44i8fDoCY1dtRHb8SBmJSpDWVdCPAfWztRbnmAQtBKAaSqQbti5uBPLHDEFBdTeC4EWki-ltzw"
+max_tokens = 16381
+temperature = 0.6
+
+# Browser configuration for headless mode
+[browser]
+headless = true
+disable_security = true
+
+# Search engine configuration
+[search]
+# Primary search engine: "Google", "Baidu", "DuckDuckGo", "Bing"
+engine = "Bing"
+# Fallback engines in order of preference
+fallback_engines = ["DuckDuckGo", "Baidu", "Bing"]
+# Retry settings
+retry_delay = 60
+max_retries = 3
+# Language and country settings
+lang = "zh"
+country = "cn"
+
+

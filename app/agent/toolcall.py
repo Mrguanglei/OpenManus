@@ -6,7 +6,7 @@ from pydantic import Field
 
 from app.agent.react import ReActAgent
 from app.exceptions import TokenLimitExceeded
-from app.logger import logger
+from app.logger import logger, write_trace_md
 from app.prompt.toolcall import NEXT_STEP_PROMPT, SYSTEM_PROMPT
 from app.schema import TOOL_CHOICE_TYPE, AgentState, Message, ToolCall, ToolChoice
 from app.tool import CreateChatCompletion, Terminate, ToolCollection
@@ -88,6 +88,24 @@ class ToolCallAgent(ReActAgent):
             )
             logger.info(f"🔧 Tool arguments: {tool_calls[0].function.arguments}")
 
+        # --- TRACE LOG ---
+        try:
+            from datetime import datetime
+            trace_content = f"""
+## [THINK] {datetime.now().isoformat()}
+- Agent: {self.name}
+- Step: {self.current_step}
+- User Input: {self.messages[-1].content if self.messages else ''}
+- LLM Input: {self.messages}
+- LLM Output: {content}
+- Tool Calls: {tool_calls}
+- Token Usage: Input={getattr(self.llm, 'total_input_tokens', '?')}, Completion={getattr(self.llm, 'total_completion_tokens', '?')}
+"""
+            write_trace_md(trace_content)
+        except Exception as e:
+            logger.warning(f"Trace log write failed: {e}")
+        # --- END TRACE LOG ---
+
         try:
             if response is None:
                 raise RuntimeError("No response received from the LLM")
@@ -116,6 +134,7 @@ class ToolCallAgent(ReActAgent):
 
             # For 'auto' mode, continue with content if no commands but content exists
             if self.tool_choices == ToolChoice.AUTO and not self.tool_calls:
+                self.state = AgentState.FINISHED
                 return bool(content)
 
             return bool(self.tool_calls)
@@ -161,6 +180,23 @@ class ToolCallAgent(ReActAgent):
             self.memory.add_message(tool_msg)
             results.append(result)
 
+            # --- TRACE LOG ---
+            try:
+                from datetime import datetime
+                trace_content = f"""
+## [ACT] {datetime.now().isoformat()}
+- Agent: {self.name}
+- Step: {self.current_step}
+- Tool Name: {command.function.name}
+- Tool Input: {command.function.arguments}
+- Tool Output: {result}
+- Token Usage: Input={getattr(self.llm, 'total_input_tokens', '?')}, Completion={getattr(self.llm, 'total_completion_tokens', '?')}
+"""
+                write_trace_md(trace_content)
+            except Exception as e:
+                logger.warning(f"Trace log write failed: {e}")
+            # --- END TRACE LOG ---
+
         return "\n\n".join(results)
 
     async def execute_tool(self, command: ToolCall) -> str:
@@ -194,6 +230,23 @@ class ToolCallAgent(ReActAgent):
                 if result
                 else f"Cmd `{name}` completed with no output"
             )
+
+            # --- TRACE LOG ---
+            try:
+                from datetime import datetime
+                trace_content = f"""
+## [TOOL EXECUTE] {datetime.now().isoformat()}
+- Agent: {self.name}
+- Step: {self.current_step}
+- Tool Name: {name}
+- Tool Input: {args}
+- Tool Output: {observation}
+- Token Usage: Input={getattr(self.llm, 'total_input_tokens', '?')}, Completion={getattr(self.llm, 'total_completion_tokens', '?')}
+"""
+                write_trace_md(trace_content)
+            except Exception as e:
+                logger.warning(f"Trace log write failed: {e}")
+            # --- END TRACE LOG ---
 
             return observation
         except json.JSONDecodeError:

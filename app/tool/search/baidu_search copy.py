@@ -1,4 +1,3 @@
-import asyncio
 from typing import List
 
 from baidusearch.baidusearch import search
@@ -15,13 +14,18 @@ class BaiduSearchEngine(WebSearchEngine):
 
         Returns results formatted according to SearchItem model.
         """
-        # Perform the search directly (WebSearch will handle async execution)
-        raw_results = search(query, num_results=num_results)
+        # Perform the actual search
+        raw_results = search(query, num_results=num_results, debug=1)
 
         # Convert raw results to SearchItem format
         results = []
         for i, item in enumerate(raw_results):
-            if isinstance(item, dict):
+            if isinstance(item, str):
+                # If it's just a URL
+                results.append(
+                    SearchItem(title=f"Baidu Result {i+1}", url=item, description=None)
+                )
+            elif isinstance(item, dict):
                 # If it's a dictionary with details
                 results.append(
                     SearchItem(
@@ -29,11 +33,6 @@ class BaiduSearchEngine(WebSearchEngine):
                         url=item.get("url", ""),
                         description=item.get("abstract", None),
                     )
-                )
-            elif isinstance(item, str):
-                # If it's just a URL
-                results.append(
-                    SearchItem(title=f"Baidu Result {i+1}", url=item, description=None)
                 )
             else:
                 # Try to get attributes directly

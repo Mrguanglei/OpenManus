@@ -12,6 +12,7 @@ from pydantic_core.core_schema import ValidationInfo
 
 from app.config import config
 from app.llm import LLM
+from app.logger import logger
 from app.tool.base import BaseTool, ToolResult
 from app.tool.web_search import WebSearch
 
@@ -235,10 +236,14 @@ class BrowserUseTool(BaseTool, Generic[Context]):
                         return ToolResult(
                             error="URL is required for 'go_to_url' action"
                         )
-                    page = await context.get_current_page()
-                    await page.goto(url)
-                    await page.wait_for_load_state()
-                    return ToolResult(output=f"Navigated to {url}")
+                    try:
+                        page = await context.get_current_page()
+                        await page.goto(url, timeout=15000)  # 15 second timeout
+                        await page.wait_for_load_state(timeout=10000)  # 10 second timeout
+                        return ToolResult(output=f"Navigated to {url}")
+                    except Exception as e:
+                        logger.warning(f"Failed to navigate to {url}: {str(e)}")
+                        return ToolResult(error=f"Navigation failed: {str(e)}")
 
                 elif action == "go_back":
                     await context.go_back()
@@ -253,19 +258,42 @@ class BrowserUseTool(BaseTool, Generic[Context]):
                         return ToolResult(
                             error="Query is required for 'web_search' action"
                         )
+
+                    logger.info(f"Starting web search for: {query}")
+
                     # Execute the web search and return results directly without browser navigation
                     search_response = await self.web_search_tool.execute(
                         query=query, fetch_content=True, num_results=1
                     )
-                    # Navigate to the first search result
+
+                    # Check if we have results before trying to navigate
+                    if not search_response.results:
+                        logger.info("No search results found")
+                        return ToolResult(
+                            output=f"Search completed but no results found for: {query}"
+                        )
+
+                    # Navigate to the first search result with shorter timeout
                     first_search_result = search_response.results[0]
                     url_to_navigate = first_search_result.url
 
-                    page = await context.get_current_page()
-                    await page.goto(url_to_navigate)
-                    await page.wait_for_load_state()
+                    logger.info(f"Attempting to navigate to: {url_to_navigate}")
 
-                    return search_response
+                    try:
+                        page = await context.get_current_page()
+                        # Use shorter timeout to prevent hanging
+                        await page.goto(url_to_navigate, timeout=15000)  # 15 second timeout
+                        await page.wait_for_load_state(timeout=10000)  # 10 second timeout
+                        logger.info("Navigation completed successfully")
+                        return ToolResult(
+                            output=f"Successfully navigated to search result: {first_search_result.title}"
+                        )
+                    except Exception as e:
+                        # If navigation fails, still return the search results
+                        logger.warning(f"Failed to navigate to {url_to_navigate}: {str(e)}")
+                        return ToolResult(
+                            output=f"Search completed. Found: {first_search_result.title} ({url_to_navigate}). Navigation failed: {str(e)}"
+                        )
 
                 # Element interaction actions
                 elif action == "click_element":
@@ -451,7 +479,10 @@ Page content:
                         )
                     await context.switch_to_tab(tab_id)
                     page = await context.get_current_page()
-                    await page.wait_for_load_state()
+                    try:
+                        await page.wait_for_load_state(timeout=5000)  # 5 second timeout
+                    except Exception as e:
+                        logger.warning(f"Tab switch load state wait failed: {str(e)}, continuing anyway")
                     return ToolResult(output=f"Switched to tab {tab_id}")
 
                 elif action == "open_tab":
@@ -502,7 +533,12 @@ Page content:
             page = await ctx.get_current_page()
 
             await page.bring_to_front()
-            await page.wait_for_load_state()
+
+            # Add timeout to prevent hanging
+            try:
+                await page.wait_for_load_state(timeout=5000)  # 5 second timeout
+            except Exception as e:
+                logger.warning(f"Page load state wait failed: {str(e)}, continuing anyway")
 
             screenshot = await page.screenshot(
                 full_page=True, animations="disabled", type="jpeg", quality=100

@@ -6,7 +6,7 @@ from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
 from mcp.types import ListToolsResult, TextContent
 
-from app.logger import logger
+from app.logger import logger, write_trace_md
 from app.tool.base import BaseTool, ToolResult
 from app.tool.tool_collection import ToolCollection
 
@@ -29,6 +29,19 @@ class MCPClientTool(BaseTool):
             content_str = ", ".join(
                 item.text for item in result.content if isinstance(item, TextContent)
             )
+            # --- TRACE LOG ---
+            try:
+                from datetime import datetime
+                trace_content = f"""
+## [MCP TOOL CALL] {datetime.now().isoformat()}
+- MCP Tool: {self.original_name}
+- Input: {kwargs}
+- Output: {content_str or 'No output returned.'}
+"""
+                write_trace_md(trace_content)
+            except Exception as e:
+                logger.warning(f"Trace log write failed: {e}")
+            # --- END TRACE LOG ---
             return ToolResult(output=content_str or "No output returned.")
         except Exception as e:
             return ToolResult(error=f"Error executing tool: {str(e)}")

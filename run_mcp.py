@@ -107,6 +107,8 @@ async def run_mcp() -> None:
         logger.info("Program interrupted by user")
     except Exception as e:
         logger.error(f"Error running MCPAgent: {str(e)}", exc_info=True)
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
     finally:
         await runner.cleanup()
